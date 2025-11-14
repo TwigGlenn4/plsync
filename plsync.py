@@ -11,19 +11,29 @@
 #   apt install rsgain
 
 from os import listdir as os_listdir
+from os import path as path
+from os import sep as PATH_SEPARATOR
 from sys import argv as sys_argv
 from tinytag import TinyTag
-from yt_dlp import YoutubeDL
+import yt_dlp
 
-MUSIC_PATH = "/home/twig/Music/"
-DEFAULT_PLAYLIST_URL = "https://music.youtube.com/playlist?list=PL899RuEJchv4GsWD1onvazX51kF3naNJN&si=WzOCIOFkXBKZv-46"
-ASK = True
+CONFIG_MUSIC_PATH = "/home/twig/Music/Tracks/"
+CONFIG_COOKIES_PATH = "cookies.txt"
+CONFIG_DEFAULT_PLAYLIST_URLS = [ "https://music.youtube.com/playlist?list=PL899RuEJchv4GsWD1onvazX51kF3naNJN",
+                                 "https://music.youtube.com/playlist?list=PL899RuEJchv6ShrUrjGMunZFUl9VYdVNI"]
+CONFIG_ASK_BEFORE_DOWNLOADING = True
+
+# validate paths
+MUSIC_PATH = path.abspath(CONFIG_MUSIC_PATH) + PATH_SEPARATOR
+COOKIES_PATH = path.abspath(CONFIG_COOKIES_PATH)
 
 
-YDL_OPTS = {'extract_flat': 'discard_in_playlist',
+YDL_OPTS = {
+  'cookiefile': COOKIES_PATH,
+  'extract_flat': 'discard_in_playlist',
   'final_ext': 'mp3',
   'format': 'bestaudio/best',
-  'fragment_retries': 10,
+  'fragment_retries': 2,
   'ignoreerrors': 'only_download',
   'outtmpl': {'default': MUSIC_PATH+'%(artist,channel|Unknown)s - %(track,title|Unknown)s.%(ext)s',
       'pl_thumbnail': ''},
@@ -42,12 +52,20 @@ YDL_OPTS = {'extract_flat': 'discard_in_playlist',
     {'exec_cmd': ['rsgain custom -c a -l -10'],
       'key': 'Exec',
       'when': 'after_move'}],
-  'retries': 10,
+  'retries': 1,
   'warn_when_outdated': True,
   # 'quiet': True,
   'writethumbnail': True}
 
-
+YDL_DATA_OPTS = {
+  'cookiefile': COOKIES_PATH,
+  'extract_flat': True,  # Extract only the video information, not the actual videos
+  'force_generic_extractor': True,
+  'noplaylist': False,
+  'quiet': True,  # Suppress console output
+  'no_warnings': True, # Hide "YouTube Music is not directly supported" warning
+  'simulate': True, # Don't actually download, just simulate to get info
+}
 
 def get_youtube_slug( link:str ) -> str:
   splitStr = "v="
@@ -92,19 +110,10 @@ def find_local_songs( path:str ) -> list[str]:
 def find_playlist_songs_ytdlp(playlist_link:str) -> list[str]:
   print("Finding playlist using yt-dlp...")
 
-  ytdlp_playlist_opts = {
-        'extract_flat': True,  # Extract only the video information, not the actual videos
-        'force_generic_extractor': True,
-        'noplaylist': False,
-        'quiet': True,  # Suppress console output
-        'no_warnings': True, # Hide "YouTube Music is not directly supported" warning
-        'simulate': True, # Don't actually download, just simulate to get info
-    }
-
   found_songs = []
   playlist_info = None
   
-  with YoutubeDL(ytdlp_playlist_opts) as ytdl:
+  with yt_dlp.YoutubeDL(YDL_DATA_OPTS) as ytdl:
     playlist_info = ytdl.extract_info(playlist_link, download=False)
 
   # print(playlist_info['_type'])
@@ -141,12 +150,26 @@ def get_songs_needed(local_songs:list[str], remote_songs:list[str]) -> list[str]
 
 
 
-def download_song(ytdl:YoutubeDL, slug:str) -> str:
+def download_song(ytdl:yt_dlp.YoutubeDL, slug:str) -> str:
   # print(f"Downloading {slug}...")
+  error_code = 1
+  error_slug = ""
+  # try:
   error_code = ytdl.download(slug)
-  
-  return slug
 
+  if error_code != 0:
+    error_slug = slug
+    # with yt_dlp.YoutubeDL(YDL_DATA_OPTS) as ytdl:
+    print(f"    ERROR: Error while downloading [{slug}]. NOTE: Can't tell if serious or non-fatal error. Song may have been downloaded fine.")
+    
+  return error_slug
+
+
+def deduplicate(list1:list, list2:list):
+  for item in list2:
+    if item not in list1:
+      list1.append(item)
+  return list1
 
 
 def main():
@@ -156,44 +179,62 @@ def main():
   print(f"  Found {len(found_songs)} songs locally." )
 
 
-  # Use first argument as playlist url if it exists, default to DEFAULT_PLAYLIST_URL
+  # Use arguments as playlist urls if they exist, default to CONFIG_DEFAULT_PLAYLIST_URLS
   # print(f"len(sys_argv)={len(sys_argv)}")
-  playlist_url = DEFAULT_PLAYLIST_URL
+  playlist_urls = CONFIG_DEFAULT_PLAYLIST_URLS
   if len(sys_argv) > 1:
-    playlist_url = sys_argv[1]
+    playlist_urls = []
+    for i in range(1, len(sys_argv)):
+      playlist_urls[i-1] = sys_argv[i]
   
-  if (not isinstance(playlist_url, str)) or playlist_url == "":
-    print("No URL specified! Please give a URL in quotes as an argument, or populate the DEFAULT_PLAYLIST_URL constant in the script.")
+  if (playlist_urls == [] or not isinstance(playlist_urls[0], str)):
+    print("No URL specified! Please give a URL in quotes as an argument, or populate the CONFIG_DEFAULT_PLAYLIST_URLS constant in the script.")
     return 1
 
-  # Find songs in the online playlist that don't exist locally
-  playlist_songs = find_playlist_songs_ytdlp(playlist_url)
-  download_list = get_songs_needed(found_songs, playlist_songs)
+  # Find songs in the online playlists that don't exist locally
+  download_list = []
+  unique_pl_list = []
+  for pl_url in playlist_urls:
+    playlist_songs = find_playlist_songs_ytdlp(pl_url)
+    new_songs = get_songs_needed(found_songs, playlist_songs)
 
+    unique_pl_list = deduplicate(unique_pl_list, playlist_songs)
+    download_list.extend(new_songs)
+    found_songs.extend(new_songs)
 
   # Inform the user of how many songs will be downloaded, or return if none
   if len(download_list) == 0:
     print("All songs already downloaded.")
     return 0
-  print(f"Need to download {len(download_list)} of {len(playlist_songs)} songs.")
+  # print(download_list)
+  print(f"Need to download {len(download_list)} of {len(unique_pl_list)} songs.")
 
-  if ASK:
-    download = input("Continue with Download? (y/N):")
+  if CONFIG_ASK_BEFORE_DOWNLOADING:
+    download = input("Continue with Download? (y/N): ")
     if not (download == "y" or download == "Y"):
       return 0
+    
+  errored_slugs = []
   
   # Download the songs
-  with YoutubeDL(YDL_OPTS) as yt_downloader:
+  with yt_dlp.YoutubeDL(YDL_OPTS) as yt_downloader:
     num_songs_downloaded = 0
     for slug in download_list:
       num_songs_downloaded += 1
       print(f"  Downloading song {num_songs_downloaded}/{len(download_list)}")
-      song = download_song(yt_downloader, slug)
+      error_slug = download_song(yt_downloader, slug)
+      if error_slug != "":
+        errored_slugs.append(error_slug)
       print("--------------------")
 
   print(f"Done, downloaded {len(download_list)} songs!")
+
+  if len(errored_slugs) > 0:
+    print("Errored songs: " + str(errored_slugs))
   return 0
 
-
 if __name__ == "__main__":
-  main()
+  try:
+    main()
+  except KeyboardInterrupt:
+    exit(0)
