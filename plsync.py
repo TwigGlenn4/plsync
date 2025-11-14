@@ -91,7 +91,7 @@ def find_local_songs( path:str ) -> list[str]:
     purl = tag.other.get("purl")
 
     if purl is None:
-      print(f"  No purl tag to read slug from, skipping {filename}")
+      # print(f"  No purl tag to read slug from, skipping {filename}")
       continue
 
     slug = get_youtube_slug(purl[0])
@@ -173,6 +173,10 @@ def deduplicate(list1:list, list2:list):
 
 
 def main():
+
+  print(COOKIES_PATH)
+  exit()
+
   # Find all local songs
   print("Finding local songs...")
   found_songs = find_local_songs(MUSIC_PATH)
