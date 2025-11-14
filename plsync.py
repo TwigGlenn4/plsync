@@ -84,7 +84,7 @@ def find_local_songs( path:str ) -> list[str]:
     # print(filename)
 
     if not TinyTag.is_supported(filename):
-      print("  Unsupported file, skipping " + filename)
+      # print("  Unsupported file, skipping " + filename)
       continue
 
     tag = TinyTag.get(filename)
