@@ -1,0 +1,7 @@
+{
+  "ask_before_downloading": true,
+  "cookies_path": "~/.config/plsync/cookies.txt",
+  "music_path": "~/Music/Tracks",
+  "playlist_urls": [ "https://music.youtube.com/playlist?list=OLAK5uy_k8FKntOa4ITd-iDboWkQD-0z0Ju__9cEk" ],
+  "filename_format": "%(artist,channel|Unknown)s - %(track,title|Unknown)s.%(ext)s"
+}
