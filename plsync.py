@@ -75,11 +75,10 @@ def read_config_file(config_path: str) -> dict:
   print("Using config file", config_path)
   with open(config_path, "r") as config_file:
     loaded_config = json.load(config_file)
-    config = DEFAULT_CONFIG
+    config = DEFAULT_CONFIG.copy()
     for key in config:
       if key in loaded_config:
         config[key] = loaded_config[key]
-        print(f"[CONFIG] read {key}: {config[key]}")
 
   # expand paths
   config["cookies_path"] = path.expanduser(config["cookies_path"])
@@ -109,7 +108,7 @@ def get_youtube_slug( link:str ) -> str:
   return slug
 
 
-def find_local_songs( path:str ) -> list[str]:
+def find_local_tracks( path:str ) -> list[str]:
   found_songs = []
 
   # print(os_listdir(path))
@@ -142,7 +141,7 @@ def find_local_songs( path:str ) -> list[str]:
 
 
 def find_playlist_songs_ytdlp(playlist_link:str) -> list[str]:
-  print("Finding playlist using yt-dlp...")
+  print("  Finding playlist using yt-dlp...")
 
   found_songs = []
   playlist_info = None
@@ -154,14 +153,14 @@ def find_playlist_songs_ytdlp(playlist_link:str) -> list[str]:
   # print(playlist_info)
 
   if "_type" in playlist_info and playlist_info["_type"] == "playlist":
-    print(f"  Found playlist \"{playlist_info['title']}\" containing {playlist_info['playlist_count']} songs")
+    print(f"    Found playlist \"{playlist_info['title']}\" containing {playlist_info['playlist_count']} songs")
     for song in playlist_info['entries']:
       slug = song['id']
       found_songs.append(slug)
       # print("    "+slug)
 
   elif "duration_string" in playlist_info:
-    print(f"  Found video \"{playlist_info['title']}\" by {playlist_info['channel']}")
+    print(f"    Found video \"{playlist_info['title']}\" by {playlist_info['channel']}")
     slug = playlist_info['id']
     found_songs = [slug]
     # print("    "+slug)
@@ -206,69 +205,70 @@ def deduplicate(list1:list, list2:list):
   return list1
 
 
-def main():
+def download_playlist(download_path: str, playlist_urls: list[str], ask_before_downloading: bool) -> int:
+  print("Processing", download_path)
 
-  config = read_config_file(CONFIG_PATH)
-
-
-  # Find all local songs
-  print("Finding local songs...")
-  found_songs = find_local_songs(config["music_path"])
-  print(f"  Found {len(found_songs)} songs locally." )
+  local_tracks = find_local_tracks(download_path)
+  print(f"  Found {len(local_tracks)} songs locally." )
 
 
-  # Use arguments as playlist urls if they exist, default to DEFAULT_CONFIG["playlist_urls"]
-  # print(f"len(sys_argv)={len(sys_argv)}")
-  playlist_urls = config["playlist_urls"]
-  if len(sys_argv) > 1:
-    playlist_urls = []
-    for i in range(1, len(sys_argv)):
-      playlist_urls[i-1] = sys_argv[i]
-
-  if (playlist_urls == [] or not isinstance(playlist_urls[0], str)):
-    print("No URL specified! Please give a URL in quotes as an argument, or populate the \"playlist_urls\" option in the config.")
-    return 1
-
-  # Find songs in the online playlists that don't exist locally
+  # Build list of downloads
   download_list = []
-  unique_pl_list = []
-  for pl_url in playlist_urls:
-    playlist_songs = find_playlist_songs_ytdlp(pl_url)
-    new_songs = get_songs_needed(found_songs, playlist_songs)
+  seen_tracks = local_tracks.copy()
+  unique_playlist_tracks = []
 
-    unique_pl_list = deduplicate(unique_pl_list, playlist_songs)
-    download_list.extend(new_songs)
-    found_songs.extend(new_songs)
+  for url in playlist_urls:
+    playlist_tracks = find_playlist_songs_ytdlp(url)
+    new_tracks = get_songs_needed(seen_tracks, playlist_tracks)
+
+    unique_playlist_tracks = deduplicate(unique_playlist_tracks, playlist_tracks)
+
+    seen_tracks.extend(new_tracks)
+    download_list.extend(new_tracks)
+
 
   # Inform the user of how many songs will be downloaded, or return if none
   if len(download_list) == 0:
-    print("All songs already downloaded.")
+    print(f"All {len(unique_playlist_tracks)} songs already downloaded.")
     return 0
   # print(download_list)
-  print(f"Need to download {len(download_list)} of {len(unique_pl_list)} songs.")
+  print(f"  Need to download {len(download_list)} of {len(unique_playlist_tracks)} songs.")
 
-  if config["ask_before_downloading"]:
-    download = input("Continue with Download? (y/N): ")
-    if not (download == "y" or download == "Y"):
+
+  if ask_before_downloading:
+    download = input("  Continue with Download? (y/N): ").strip()
+    if not (download.lower() == "y" or download.lower() == "yes"):
       return 0
 
-  errored_slugs = []
+  errored_track_slugs = []
 
   # Download the songs
   with yt_dlp.YoutubeDL(YDL_OPTS) as yt_downloader:
     num_songs_downloaded = 0
     for slug in download_list:
       num_songs_downloaded += 1
-      print(f"  Downloading song {num_songs_downloaded}/{len(download_list)}")
+      print(f"    Downloading song {num_songs_downloaded}/{len(download_list)}")
       error_slug = download_song(yt_downloader, slug)
       if error_slug != "":
-        errored_slugs.append(error_slug)
+        errored_track_slugs.append(error_slug)
       print("--------------------")
 
-  print(f"Done, downloaded {len(download_list)} songs!")
+  print(f"  Done, downloaded {len(download_list)} songs!")
 
-  if len(errored_slugs) > 0:
-    print("Errored songs: " + str(errored_slugs))
+  if len(errored_track_slugs) > 0:
+    print(f"  Errored songs: ({len(errored_track_slugs)}) {str(errored_track_slugs)}")
+
+  return len(download_list)
+
+
+
+
+def main():
+
+  config = read_config_file(CONFIG_PATH)
+
+  download_playlist(config["music_path"], config["playlist_urls"], config["ask_before_downloading"])
+
   return 0
 
 
