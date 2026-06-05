@@ -84,13 +84,19 @@ def read_config_file(config_path: str) -> dict:
   # expand vars ($HOME) and user (~)
   config_path = expand_path(config_path)
 
-  print("Using config file", config_path)
-  with open(config_path, "r") as config_file:
-    loaded_config = json.load(config_file)
+
+  try:
+    with open(config_path, "r") as config_file:
+      print("Using config file", config_path)
+      loaded_config = json.load(config_file)
+      config = DEFAULT_CONFIG.copy()
+      for key in config:
+        if key in loaded_config:
+          config[key] = loaded_config[key]
+  except IOError:
+    print(f"Could not open config file \"{config_path}\", using defaults.")
     config = DEFAULT_CONFIG.copy()
-    for key in config:
-      if key in loaded_config:
-        config[key] = loaded_config[key]
+
 
   # expand and sanitize cookies_path
   config["cookies_path"] = expand_path(config["cookies_path"])
@@ -264,8 +270,8 @@ def download_playlist(download_path: str, playlist_urls: list[str], config: dict
 
 
   if config["ask_before_downloading"]:
-    download = input("  Continue with download? (y/N): ").strip()
-    if not (download.lower() == "y" or download.lower() == "yes"):
+    download = input("  Continue with download? (y/N): ").strip().lower()
+    if not (download == "y" or download == "yes"):
       return 0
 
   errored_track_slugs = []
@@ -295,21 +301,49 @@ def download_playlist(download_path: str, playlist_urls: list[str], config: dict
   return len(download_list)
 
 
+def write_config(new_config_path: str) -> int:
+
+  new_config_path = expand_path(new_config_path)
+  makedirs(path.dirname(new_config_path), exist_ok=True) # ensure path to the new config file exists
+
+  if path.isfile(new_config_path):
+    prompt = input(f"Overwrite existing file at \"{new_config_path}\"? (y/N): ").strip().lower()
+    if not (prompt == "y" or prompt == "yes"):
+      return 0
+
+  try:
+    with open(new_config_path, "w") as new_config_file:
+      json.dump(DEFAULT_CONFIG, new_config_file, indent=2)
+  except IOError:
+    print(f"Error: Could not write to \"{new_config_path}\"")
+    return -1
+
+  print(f"Wrote default config to \"{new_config_path}\"")
+  return 0
+
 
 
 def main():
 
   parser = argparse.ArgumentParser(description="Synchronize youtube playlists into folders with reduced redownloading")
-  parser.add_argument("-c", "--config", type=str, default=CONFIG_PATH, help="Path to plsync config file (default: \"~/.config/plsync/config.json\").")
+  parser.add_argument("-c", "--config", type=str, default=CONFIG_PATH, help="Path to config file (default: \"~/.config/plsync/config.json\").")
+  parser.add_argument("-w", "--wconf", type=str, nargs="?", default="", const=CONFIG_PATH, help="Write a default config file at the given path (default: \"~/.config/plsync/config.json\").")
   parser.add_argument("url", type=str, nargs="?", default="", help="Download this playlist or video into the current working directory")
   args = parser.parse_args()
 
+  # write config and exit if -w argument used
+  if args.wconf != "":
+    return write_config(args.wconf)
+
+  # read config file
   config = read_config_file(args.config)
 
+  # download url into CWD if url argument used
   if args.url:
     download_playlist(getcwd(), [args.url], config)
     return 0
 
+  # regular behaviour downloading playlists from config
   for playlist in config["playlists"]:
     download_playlist(playlist["path"], playlist["urls"], config)
 

@@ -6,8 +6,10 @@
   "playlists": [
     {
       "path": "~/Music/Tracks",
-      "urls": [ "https://music.youtube.com/playlist?list=OLAK5uy_k8FKntOa4ITd-iDboWkQD-0z0Ju__9cEk",
-                "https://music.youtube.com/playlist?list=OLAK5uy_nYgA6_SXlD09Kc6G0TmA91je3qDeD9lzs" ]
+      "urls": [
+        "https://music.youtube.com/playlist?list=OLAK5uy_k8FKntOa4ITd-iDboWkQD-0z0Ju__9cEk",
+        "https://music.youtube.com/playlist?list=OLAK5uy_nYgA6_SXlD09Kc6G0TmA91je3qDeD9lzs"
+      ]
     }
   ]
 }
