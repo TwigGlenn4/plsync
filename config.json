@@ -1,7 +1,13 @@
 {
   "ask_before_downloading": true,
   "cookies_path": "~/.config/plsync/cookies.txt",
-  "music_path": "~/Music/Tracks",
-  "playlist_urls": [ "https://music.youtube.com/playlist?list=OLAK5uy_k8FKntOa4ITd-iDboWkQD-0z0Ju__9cEk" ],
-  "filename_format": "%(artist,channel|Unknown)s - %(track,title|Unknown)s.%(ext)s"
+  "filename_format": "%(artist,channel|Unknown)s - %(track,title|Unknown)s.%(ext)s",
+  "ytdlp_quiet": false,
+  "playlists": [
+    {
+      "path": "~/Music/Tracks",
+      "urls": [ "https://music.youtube.com/playlist?list=OLAK5uy_k8FKntOa4ITd-iDboWkQD-0z0Ju__9cEk",
+                "https://music.youtube.com/playlist?list=OLAK5uy_nYgA6_SXlD09Kc6G0TmA91je3qDeD9lzs" ]
+    }
+  ]
 }
