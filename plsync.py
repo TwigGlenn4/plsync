@@ -6,9 +6,10 @@
 #   tinytag - read metadata on existing tracks
 #   yt-dlp - get playlist information and download tracks
 #   rsgain - automatically adjust ReplayGain metadata for a more consistent volume across tracks
+#   yt-dlp-ejs, deno - solve JS challenges required by YouTube
 # Install Dependencies
-#   pip3 install tinytag yt-dlp
-#   apt install rsgain
+#   pip3 install tinytag yt-dlp yt-dlp-ejs
+#   apt install rsgain deno
 
 import argparse
 import json
