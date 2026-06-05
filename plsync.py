@@ -10,12 +10,12 @@
 #   pip3 install tinytag yt-dlp
 #   apt install rsgain
 
+import argparse
 import json
-from os import listdir, makedirs, path
-from sys import argv as sys_argv
+from os import getcwd, listdir, makedirs, path
 
-import yt_dlp
 from tinytag import TinyTag
+from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadError, ExtractorError, PostProcessingError
 
 CONFIG_PATH = "~/.config/plsync/config.json"
@@ -77,7 +77,7 @@ YDL_DATA_OPTS = {
 
 def expand_path(work_path:str) -> str:
   """Expand environment vars and the '~' home shortcut"""
-  return path.expanduser(path.expandvars(work_path))
+  return path.abspath(path.expanduser(path.expandvars(work_path)))
 
 
 def read_config_file(config_path: str) -> dict:
@@ -167,7 +167,7 @@ def find_playlist_songs_ytdlp(playlist_link:str) -> list[str]:
   found_songs: list[str] = []
   playlist_info = None
 
-  with yt_dlp.YoutubeDL(YDL_DATA_OPTS) as ytdl:
+  with YoutubeDL(YDL_DATA_OPTS) as ytdl:
     try:
       playlist_info = ytdl.extract_info(playlist_link, download=False)
     except (DownloadError, ExtractorError):
@@ -209,7 +209,7 @@ def get_songs_needed(local_songs:list[str], remote_songs:list[str]) -> list[str]
 
 
 
-def download_song(ytdl:yt_dlp.YoutubeDL, slug:str) -> str:
+def download_song(ytdl:YoutubeDL, slug:str) -> str:
   # print(f"Downloading {slug}...")
   error = ""
   try:
@@ -276,7 +276,7 @@ def download_playlist(download_path: str, playlist_urls: list[str], config: dict
   yt_dlp_opts["outtmpl"]["default"] = path.join(download_path, config["filename_format"])
 
   # Download the songs
-  with yt_dlp.YoutubeDL(yt_dlp_opts) as yt_downloader:
+  with YoutubeDL(yt_dlp_opts) as yt_downloader:
     num_songs_downloaded = 0
     for slug in download_list:
       num_songs_downloaded += 1
@@ -299,7 +299,16 @@ def download_playlist(download_path: str, playlist_urls: list[str], config: dict
 
 def main():
 
-  config = read_config_file(CONFIG_PATH)
+  parser = argparse.ArgumentParser(description="Synchronize youtube playlists into folders with reduced redownloading")
+  parser.add_argument("-c", "--config", type=str, default=CONFIG_PATH, help="Path to plsync config file (default: \"~/.config/plsync/config.json\").")
+  parser.add_argument("url", type=str, nargs="?", default="", help="Download this playlist or video into the current working directory")
+  args = parser.parse_args()
+
+  config = read_config_file(args.config)
+
+  if args.url:
+    download_playlist(getcwd(), [args.url], config)
+    return 0
 
   for playlist in config["playlists"]:
     download_playlist(playlist["path"], playlist["urls"], config)
