@@ -169,25 +169,22 @@ def find_local_tracks( folder: str ) -> list[str]:
 
 
 def find_playlist_songs_ytdlp(playlist_link:str) -> list[str]:
-  print("  Finding playlist using yt-dlp...    ", end="", flush=True)
+  print("  Finding metadata using yt-dlp...    ", end="", flush=True)
 
   found_songs: list[str] = []
-  playlist_info = None
+  playlist_info: dict = {}
 
-  with YoutubeDL(YDL_DATA_OPTS) as ytdl:
+  with YoutubeDL(YDL_DATA_OPTS) as ytdl: # type: ignore[arg-type]
     try:
-      playlist_info = ytdl.extract_info(playlist_link, download=False)
+      playlist_info = dict( ytdl.extract_info(playlist_link, download=False) ) # explicitly cast YoutubeDL._InfoDict to dict
     except (DownloadError, ExtractorError):
       # ytdl.extract_info() already printed an error message
       return []
 
 
-  # print(playlist_info['_type'])
-  # print(playlist_info)
-
   if "_type" in playlist_info and playlist_info["_type"] == "playlist":
     print(f"found playlist \"{playlist_info['title']}\" containing {playlist_info['playlist_count']} songs")
-    for song in playlist_info['entries']:
+    for song in playlist_info["entries"]:
       slug = song['id']
       found_songs.append(slug)
       # print("    "+slug)
@@ -298,7 +295,7 @@ def download_playlist(download_path: str, playlist_urls: list[str], config: dict
   yt_dlp_opts["outtmpl"]["default"] = path.join(download_path, config["filename_format"])
 
   # Download the songs
-  with YoutubeDL(yt_dlp_opts) as yt_downloader:
+  with YoutubeDL(yt_dlp_opts) as yt_downloader: # type: ignore[arg-type]
     num_songs_downloaded = 0
     for slug in download_list:
       num_songs_downloaded += 1
