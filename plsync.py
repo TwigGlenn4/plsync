@@ -341,6 +341,9 @@ def main():
   parser = argparse.ArgumentParser(description="Synchronize youtube playlists into folders with reduced redownloading")
   parser.add_argument("-c", "--config", type=str, default=CONFIG_PATH, help="Path to config file (default: \"~/.config/plsync/config.json\").")
   parser.add_argument("-w", "--wconf", type=str, nargs="?", default="", const=CONFIG_PATH, help="Write a default config file at the given path (default: \"~/.config/plsync/config.json\").")
+  prompt_group = parser.add_mutually_exclusive_group()
+  prompt_group.add_argument("-y", "--yes", action="store_true", help="Skip the \"Continue with download?\" prompt.")
+  prompt_group.add_argument("-a", "--ask", action="store_true", help="Force the \"Continue with download?\" prompt.")
   parser.add_argument("url", type=str, nargs="?", default="", help="Download this playlist or video into the current working directory")
   args = parser.parse_args()
 
@@ -350,6 +353,12 @@ def main():
 
   # read config file
   config = read_config_file(args.config)
+
+  # override ask_before_downloading if -y passed
+  if args.yes:
+    config["ask_before_downloading"] = False
+  elif args.ask:
+    config["ask_before_downloading"] = True
 
   # download url into CWD if url argument used
   if args.url:
