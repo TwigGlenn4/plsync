@@ -221,7 +221,22 @@ def download_song(ytdl:YoutubeDL, slug:str) -> str:
   error = ""
   try:
     track_info = ytdl.extract_info(slug, download=False)
-    print(f"{track_info["artists"][0]} - {track_info["title"]}")
+    if "artists" in track_info:
+      print(track_info["artists"][0], end="")
+    elif "channel" in track_info:
+      print(track_info["channel"], end="")
+    else:
+      print("MISSING_ARTIST_KEY", end="")
+
+    print(" - ", end="")
+
+    if "title" in track_info:
+      print(track_info["title"])
+    elif "fulltitle" in track_info:
+      print(track_info["fulltitle"])
+    else:
+      print("MISSING_TITLE_KEY")
+
     ytdl.process_ie_result(track_info, download=True)
 
   except (DownloadError, ExtractorError, PostProcessingError) as e:
